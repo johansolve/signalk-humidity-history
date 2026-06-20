@@ -7,6 +7,8 @@ Built for *Libelle*, where two Ruuvi tags publish
 `environment.inside.relativeHumidity` and `environment.outside.relativeHumidity`
 (ratio 0–1), logged to InfluxDB 1.x by `signalk-to-influxdb`.
 
+![Humidity history webapp](docs/screenshot.png)
+
 ## How it works
 
 - The **plugin** exposes one REST endpoint,

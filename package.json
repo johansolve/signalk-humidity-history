@@ -1,0 +1,28 @@
+{
+  "name": "signalk-humidity-history",
+  "version": "0.1.0",
+  "description": "Charts relativeHumidity history from InfluxDB with selectable time ranges.",
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-category-utility",
+    "signalk-webapp"
+  ],
+  "signalk-plugin-enabled-by-default": false,
+  "signalk": {
+    "displayName": "Humidity History",
+    "appIcon": "icon.svg"
+  },
+  "main": "plugin/index.js",
+  "files": [
+    "plugin/",
+    "public/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "echo \"no tests\" && exit 0"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Luftfuktighet – historik</title>
+<link rel="icon" href="icon.svg" />
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --edge: #30363d;
+    --ink: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --inside: #58a6ff;
+    --outside: #f0883e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 14px 32px;
+    gap: 16px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .ranges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ranges button {
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .ranges button:hover { border-color: var(--accent); }
+  .ranges button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #08101c;
+    font-weight: 600;
+  }
+  .card {
+    width: min(960px, 100%);
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    min-height: 320px;
+  }
+  .status {
+    color: var(--muted);
+    font-size: 13px;
+    min-height: 18px;
+    text-align: center;
+  }
+  .status.error { color: #f85149; }
+  .exit {
+    position: fixed;
+    top: 12px; right: 16px;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    color: var(--muted); text-decoration: none;
+    font-size: 22px; line-height: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .exit:hover { color: var(--ink); background: rgba(255,255,255,0.10); }
+</style>
+</head>
+<body>
+  <a class="exit" href="/admin/#/webapps" title="Back to Signal K">✕</a>
+  <h1>Luftfuktighet – historik</h1>
+  <div class="ranges" id="ranges"></div>
+  <div class="card">
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+  </div>
+  <div class="status" id="status">Laddar…</div>
+
+<script src="vendor/chart.umd.js"></script>
+<script>
+  const RANGES = [
+    { days: 1, label: '1 dag' },
+    { days: 2, label: '2 dagar' },
+    { days: 5, label: '5 dagar' },
+    { days: 7, label: '7 dagar' },
+    { days: 14, label: '14 dagar' }
+  ];
+  const COLORS = ['#58a6ff', '#f0883e', '#3fb950', '#bc8cff', '#f778ba'];
+  const DEFAULT_DAYS = 1;
+
+  const statusEl = document.getElementById('status');
+  const rangesEl = document.getElementById('ranges');
+  let chart = null;
+  let currentDays = DEFAULT_DAYS;
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || '';
+    statusEl.classList.toggle('error', !!isError);
+  }
+
+  function fmtTick(ms, days) {
+    const d = new Date(ms);
+    const pad = (n) => String(n).padStart(2, '0');
+    if (days <= 2) {
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  }
+
+  function fmtFull(ms) {
+    const d = new Date(ms);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function buildChart() {
+    const ctx = document.getElementById('chart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        parsing: false,
+        interaction: { mode: 'nearest', intersect: false, axis: 'x' },
+        scales: {
+          x: {
+            type: 'linear',
+            ticks: {
+              color: '#8b949e',
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 14,
+              callback: (v) => fmtTick(v, currentDays)
+            },
+            grid: { color: 'rgba(255,255,255,0.06)' }
+          },
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { color: '#8b949e', callback: (v) => v + '%' },
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            title: { display: true, text: 'Relativ luftfuktighet', color: '#8b949e' }
+          }
+        },
+        plugins: {
+          legend: { labels: { color: '#e6edf3', usePointStyle: true } },
+          tooltip: {
+            callbacks: {
+              title: (items) => items.length ? fmtFull(items[0].parsed.x) : '',
+              label: (item) => `${item.dataset.label}: ${item.parsed.y.toFixed(1)}%`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  async function load(days) {
+    currentDays = days;
+    setStatus('Laddar…', false);
+    document.querySelectorAll('#ranges button').forEach((b) => {
+      b.classList.toggle('active', Number(b.dataset.days) === days);
+    });
+    try {
+      const r = await fetch(`/signalk/v1/api/humidity-history/data?days=${days}`, {
+        cache: 'no-store',
+        credentials: 'include'
+      });
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        try { const j = await r.json(); if (j.error) msg = j.error; } catch (e) {}
+        throw new Error(msg);
+      }
+      const data = await r.json();
+      const datasets = data.series.map((s, i) => ({
+        label: s.label,
+        data: s.points.map(([t, v]) => ({ x: t, y: v })),
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: COLORS[i % COLORS.length],
+        borderWidth: 1.8,
+        pointRadius: 0,
+        tension: 0.2,
+        spanGaps: false
+      }));
+      chart.data.datasets = datasets;
+      chart.update();
+      const total = datasets.reduce((n, d) => n + d.data.length, 0);
+      if (total === 0) {
+        setStatus('Ingen data i intervallet.', false);
+      } else {
+        setStatus(`Medelvärde per ${data.groupMinutes} min`, false);
+      }
+    } catch (e) {
+      setStatus(`Fel: ${e.message}`, true);
+    }
+  }
+
+  RANGES.forEach((r) => {
+    const b = document.createElement('button');
+    b.textContent = r.label;
+    b.dataset.days = r.days;
+    b.addEventListener('click', () => load(r.days));
+    rangesEl.appendChild(b);
+  });
+
+  buildChart();
+  load(DEFAULT_DAYS);
+</script>
+</body>
+</html>

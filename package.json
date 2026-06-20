@@ -16,7 +16,8 @@
   "files": [
     "plugin/",
     "public/",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "echo \"no tests\" && exit 0"
